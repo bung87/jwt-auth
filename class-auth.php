@@ -235,7 +235,10 @@ class Auth {
 
 		// Add the refresh token as a HttpOnly cookie to the response.
 		if ( $username && $password ) {
-			$this->send_refresh_token( $user, $request );
+			[$refresh_token, $expires] = $this->send_refresh_token( $user, $request );
+			$response->header('X-Refresh-Token', $refresh_token);
+			$response->header('X-Refresh-Token-Expires', $expires);
+			
 		}
 
 		return $response;
@@ -306,7 +309,6 @@ class Auth {
 	 * @param \WP_User $user The WP_User object.
 	 * @param \WP_REST_Request $request The request.
 	 *
-	 * @return void
 	 */
 	public function send_refresh_token( \WP_User $user, \WP_REST_Request $request ) {
 		$refresh_token = bin2hex( random_bytes( 32 ) );
@@ -338,6 +340,7 @@ class Auth {
 			}
 		}
 		update_user_meta( $user->ID, 'jwt_auth_refresh_tokens_expires_next', $expires_next );
+		return [$refresh_token, $expires];
 	}
 
 	/**
@@ -572,7 +575,8 @@ class Auth {
 
 		// Generate a new access token.
 		$user = get_user_by( 'id', $user_id );
-		$this->send_refresh_token( $user, $request );
+		[$refresh_token, $expires]= $this->send_refresh_token( $user, $request );
+		
 
 		$response = array(
 			'success'    => true,
@@ -580,7 +584,10 @@ class Auth {
 			'code'       => 'jwt_auth_valid_token',
 			'message'    => __( 'Token is valid', 'jwt-auth' ),
 		);
-		return new WP_REST_Response( $response );
+		$resp = new WP_REST_Response( $response );
+		$resp->header('X-Refresh-Token', $refresh_token);
+		$resp->header('X-Refresh-Token-Expires', $expires);
+		return $resp;
 	}
 
 	/**
